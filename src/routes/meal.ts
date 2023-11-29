@@ -4,6 +4,24 @@ import { randomUUID } from 'crypto'
 import { knex } from '../database'
 import { checkSessionIdCookie } from '../middlewares/check-session-id'
 
+function countOnDietMealsStreak(history: boolean[]) {
+  let counter = 0
+  let auxiliarCunter = 0
+  for (let i = 0; i < history.length; i++) {
+    const element = history[i]
+    if (!element) {
+      // off diet
+      if (counter > auxiliarCunter) {
+        auxiliarCunter = counter
+      }
+      counter = 0
+    } else {
+      counter++ // on diet
+    }
+  }
+  return counter > auxiliarCunter ? counter : auxiliarCunter
+}
+
 export async function mealRoutes(app: FastifyInstance) {
   app.get(
     '/',
@@ -73,12 +91,17 @@ export async function mealRoutes(app: FastifyInstance) {
         .where('session_id', sessionId)
         .first()
 
-      // TODO: write a query of on_diet=1 best streak
+      const onDietHistory = await knex('meals')
+        .select('on_diet')
+        .where('session_id', sessionId)
+
+      const historyInNumber = onDietHistory.map((item) => item.on_diet)
 
       return {
         mealsOffDiet: countSchema.parse(countOffDiet).count,
         mealsOnDiet: countSchema.parse(countOnDiet).count,
         allMeals: countSchema.parse(countAll).count,
+        streak: countOnDietMealsStreak(historyInNumber),
       }
     },
   )
