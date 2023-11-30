@@ -43,7 +43,7 @@ export async function mealRoutes(app: FastifyInstance) {
     {
       preHandler: [checkSessionIdCookie],
     },
-    async (request) => {
+    async (request, reply) => {
       const paramsSchema = z.object({
         id: z.string().uuid(),
       })
@@ -58,7 +58,12 @@ export async function mealRoutes(app: FastifyInstance) {
         })
         .first()
 
-      return { meal }
+      // return { meal }
+      if (meal) {
+        return reply.status(200).send({ meal })
+      } else {
+        return reply.status(404).send('Meal not found')
+      }
     },
   )
 
