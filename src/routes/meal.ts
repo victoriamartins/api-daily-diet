@@ -141,6 +141,61 @@ export async function mealRoutes(app: FastifyInstance) {
     return reply.status(201).send()
   })
 
+  app.put(
+    '/:id',
+    {
+      preHandler: [checkSessionIdCookie],
+    },
+    async (request, reply) => {
+      const bodySchema = z.object({
+        name: z.string().optional(),
+        description: z.string().optional(),
+        mealAt: z.string().optional(),
+        onDiet: z.coerce.boolean().optional(),
+      })
+      const body = bodySchema.parse(request.body) // data to update
+
+      const paramsSchema = z.object({
+        id: z.string().uuid(),
+      })
+      const { id } = paramsSchema.parse(request.params) // meal ID
+
+      const { sessionId } = request.cookies // users ID
+
+      const mealToUpdate = await knex('meals')
+        .select('*')
+        .where({
+          id,
+          session_id: sessionId,
+        })
+        .first()
+
+      // choosing which value were using (changes only if the body value is diff from database)
+      let onDietNewValue = mealToUpdate?.on_diet
+      if (body.onDiet !== undefined && body.onDiet !== mealToUpdate?.on_diet) {
+        onDietNewValue = body.onDiet
+      }
+
+      const mealWithUpdatedData = {
+        name: body.name || mealToUpdate?.name,
+        description: body.description || mealToUpdate?.description,
+        meal_at: body.mealAt || mealToUpdate?.meal_at,
+        on_diet: onDietNewValue,
+      }
+
+      const responseStatus = await knex('meals')
+        .update(mealWithUpdatedData)
+        .where('id', id)
+        .andWhere('session_id', sessionId)
+
+      if (responseStatus === 0) {
+        return reply.status(404).send('Meal not found')
+      } else {
+        return reply.status(200).send('Meal updated')
+      }
+    },
+  )
+
   app.delete(
     '/:id',
     {
